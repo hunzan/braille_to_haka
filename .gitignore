@@ -1,0 +1,22 @@
+# 忽略 Python 編譯後的檔案
+__pycache__/
+*.py[cod]
+
+# 忽略系統自動產生的檔案（Windows）
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# 忽略 VS Code 設定檔（如果你有在用 VS Code）
+.vscode/
+
+# 忽略環境變數檔
+.env
+
+# 忽略 node_modules 資料夾（前端或 JS 用）
+node_modules/
+
+# 如果你用 virtualenv 建虛擬環境
+venv/
+env/
+venv1/
