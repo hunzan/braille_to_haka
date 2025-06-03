@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>台語點字轉台羅拼音</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-yellow-100 min-h-screen flex flex-col items-center p-4 font-sans">
+<main class="flex-grow w-full flex flex-col items-center">
+  <h1 class="text-2xl font-bold mb-4" tabindex="0">台語點字轉台羅拼音</h1>
+
+  <!-- 使用說明 -->
+  <section id="usage" class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-2 mb-2 w-full max-w-6xl text-sm rounded"
+           role="region" aria-labelledby="usageTitle" tabindex="0">
+    <p>1. 請輸入符合規則的台語點字（例：⠛⠺⠂ ⠎⠊⠒ ⠙⠜⠆⠻⠆⠇⠭⠆），系統將轉換為對應台羅拼音。</p>
+    <p>2. 「om」、「uang」及「標點符號」尚未確定點字規則，請以空格或斷行做分隔。</p>
+  </section>
+
+  <!-- 顏色與字體設定 -->
+  <div class="flex flex-wrap items-center gap-4 mb-4 text-sm">
+    <div class="flex items-center">
+      <label id="bgColorLabel" for="bgColor">欄位背景顏色：</label>
+      <input type="color" id="bgColor" value="#ffffff" class="ml-1 border rounded" aria-labelledby="bgColorLabel">
+    </div>
+    <div class="flex items-center">
+      <label id="textColorLabel" for="textColor">欄位文字顏色：</label>
+      <input type="color" id="textColor" value="#000000" class="ml-1 border rounded" aria-labelledby="textColorLabel">
+    </div>
+    <div class="flex items-center">
+      <label id="fontSizeLabel" for="fontSizeSlider" class="mr-2">調整文字大小：</label>
+      <input type="range" id="fontSizeSlider" min="14" max="60" value="20" class="w-32" aria-labelledby="fontSizeLabel">
+      <span id="fontSizeValue" class="ml-2 text-gray-600">20px</span>
+    </div>
+  </div>
+
+  <!-- 主要功能區 -->
+  <div class="flex flex-col md:flex-row justify-between w-full max-w-6xl gap-4">
+    <!-- 左欄輸入 -->
+    <textarea id="inputText"
+              class="w-full md:w-1/2 p-2 border rounded resize-y h-48"
+              placeholder="請輸入台語點字（例：⠛⠺⠂ ⠎⠊⠒ ⠙⠜⠆⠻⠆⠇⠭⠆）..."></textarea>
+
+    <!-- 中間按鈕 -->
+    <div class="flex flex-col justify-center items-center gap-2 w-full md:w-1/12">
+      <button id="convertBtn" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded">轉換</button>
+      <button id="copyBtn" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded">複製</button>
+      <button id="clearBtn" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded">清除</button>
+    </div>
+
+    <!-- 右欄輸出 -->
+    <textarea id="outputText"
+              class="w-full md:w-1/2 p-2 border rounded resize-y h-48"
+              readonly
+              placeholder="台羅拼音會顯示在這裡..."
+              aria-label="轉換結果：台羅拼音"
+              aria-live="polite"
+              role="status"
+              tabindex="0"></textarea>
+  </div>
+
+  <!-- 複製狀態訊息 -->
+  <p id="copyStatus" class="mt-4 text-sm text-gray-700" aria-live="polite"></p>
+</main>
+
+<!-- 載入 script.js -->
+<script src="{{ url_for('static', filename='script.js') }}"></script>
+
+<!-- Footer：緊貼底部區塊 -->
+<footer role="contentinfo" class="mt-4 text-sm text-gray-500 text-center w-full" tabindex="0">
+  <p>© 2025 開發者：Lîm A-kâu（林阿猴）& Kim Chio（金蕉），供免費教學及學習使用。</p>
+</footer>
+</body>
+</html>

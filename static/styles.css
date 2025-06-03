@@ -1,0 +1,109 @@
+body {
+    font-family: Arial, sans-serif;
+    text-align: center;
+    padding: 20px;
+    transition: background-color 0.3s, color 0.3s;
+}
+
+.container {
+    max-width: 1000px;
+    margin: auto;
+}
+
+/* 控制列 */
+.control-bar {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: 20px;
+    margin-bottom: 20px;
+}
+
+/* 主要內容區 */
+.flex-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: stretch;
+    gap: 20px;
+}
+
+.input-section,
+.output-section {
+    width: 48%;
+    min-height: 300px;
+}
+
+textarea,
+pre {
+    width: 100%;
+    height: 100%;
+    padding: 10px;
+    line-height: 1.6;
+    box-sizing: border-box;
+    font-size: 28px;
+    resize: vertical;
+    text-align: left;
+}
+
+/* 按鈕列 */
+.button-row {
+    margin-top: 20px;
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+}
+
+button {
+    font-size: 20px;
+    padding: 10px 20px;
+    min-width: 100px;
+    border: none;
+    color: white;
+    cursor: pointer;
+    border-radius: 6px;
+}
+
+#convertBtn {
+    background-color: red;
+}
+
+#copyBtn {
+    background-color: green;
+}
+
+#clearBtn {
+    background-color: blue;
+}
+
+/* 對比配色選項 */
+.white-black {
+    background-color: white;
+    color: black;
+}
+
+.black-white {
+    background-color: black;
+    color: white;
+}
+
+.black-yellow {
+    background-color: black;
+    color: yellow;
+}
+
+/* 響應式處理：手機版垂直排列 */
+@media (max-width: 768px) {
+    .flex-container {
+        flex-direction: column;
+    }
+
+    .input-section,
+    .output-section {
+        width: 100%;
+    }
+
+    .button-row {
+        flex-direction: column;
+    }
+}
