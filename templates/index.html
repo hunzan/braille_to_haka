@@ -4,18 +4,18 @@
   <link rel="icon" href="/static/taivi.ico" type="image/x-icon">
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>【蕉台點】台語點字轉台羅拼音</title>
+  <title>【蕉台點】台語點字轉羅馬拼音工具</title>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
 </head>
 <body class="bg-yellow-100 min-h-screen flex flex-col items-center p-4 font-sans">
 <main class="flex-grow w-full flex flex-col items-center">
-  <h1 class="text-2xl font-bold mb-4" tabindex="0">蕉台點🍌台語點字轉台羅拼音</h1>
+  <h1 class="text-2xl font-bold mb-4" tabindex="0">蕉台點🍌台語點字轉羅馬拼音</h1>
 
     <a href="https://tj-to-braille-webtool.onrender.com/">
       <button style="background-color: #4CAF50; color: white;
                      padding: 6px 12px; font-size: 14px;
                      border: none; border-radius: 6px; cursor: pointer;">
-        台羅拼音轉台語點字
+        羅馬拼音轉台語點字
       </button>
     </a>
 
@@ -25,6 +25,9 @@
     <p>1. 請輸入符合規則的台語點字（例：⠛⠺⠂ ⠎⠊⠒ ⠙⠜⠆⠻⠆⠇⠭⠆），系統將轉換為對應台羅拼音。</p>
     <p>2. 「om」、「uang」及「標點符號」尚未確定點字規則，請以空格或斷行做分隔。</p>
   </section>
+
+   <!-- 功能設定一整排：顏色 + 字體 + 輸出格式 -->
+   <div class="flex flex-wrap items-center gap-4 mb-4 text-sm justify-center">
 
   <!-- 顏色與字體設定 -->
   <div class="flex flex-wrap items-center gap-4 mb-4 text-sm">
@@ -41,14 +44,23 @@
       <input type="range" id="fontSizeSlider" min="14" max="60" value="20" class="w-32" aria-labelledby="fontSizeLabel">
       <span id="fontSizeValue" class="ml-2 text-gray-600">20px</span>
     </div>
+    <!-- 輸出格式選單 -->
+    <div class="flex items-center">
+      <label for="outputMode" class="mr-2">輸出格式：</label>
+      <select id="outputMode" class="p-2 border rounded bg-white">
+        <option value="tl">台羅（TL）</option>
+        <option value="poj">白話字（POJ）</option>
+      </select>
+    </div>
   </div>
 
-  <!-- 主要功能區 -->
-  <div class="flex flex-col md:flex-row justify-between w-full max-w-6xl gap-4">
+    <!-- 三欄功能排版容器 -->
+    <div class="flex flex-col md:flex-row w-full gap-4">
+
     <!-- 左欄輸入 -->
     <textarea id="inputText"
-              class="w-full md:w-1/2 p-2 border rounded resize-y h-48"
-              placeholder="請輸入台語點字（例：⠛⠺⠂ ⠎⠊⠒ ⠙⠜⠆⠻⠆⠇⠭⠆）..."></textarea>
+          class="w-full md:w-1/2 p-2 border rounded resize-y h-48 leading-relaxed"
+          placeholder="請輸入台語點字（例：⠛⠺⠂ ⠎⠊⠒ ⠙⠜⠆⠻⠆⠇⠭⠆）..."></textarea>
 
     <!-- 中間按鈕 -->
     <div class="flex flex-col justify-center items-center gap-2 w-full md:w-1/12">
@@ -59,25 +71,28 @@
 
     <!-- 右欄輸出 -->
     <textarea id="outputText"
-              class="w-full md:w-1/2 p-2 border rounded resize-y h-48"
-              readonly
-              placeholder="台羅拼音會顯示在這裡..."
-              aria-label="轉換結果：台羅拼音"
-              aria-live="polite"
-              role="status"
-              tabindex="0"></textarea>
+          class="w-full md:w-1/2 p-2 border rounded resize-y h-48 leading-relaxed"
+          readonly
+          placeholder="台語羅馬字會顯示在這裡..."
+          aria-label="轉換結果：台羅拼音或白話字POJ"
+          aria-live="polite"
+          role="textbox"
+          tabindex="0"></textarea>
   </div>
 
   <!-- 複製狀態訊息 -->
   <p id="copyStatus" class="mt-4 text-sm text-gray-700" aria-live="polite"></p>
-</main>
 
-<!-- 載入 script.js -->
-<script src="{{ url_for('static', filename='script.js') }}"></script>
+  </div>
+</main>
 
 <!-- Footer：緊貼底部區塊 -->
 <footer role="contentinfo" class="mt-4 text-sm text-gray-500 text-center w-full" tabindex="0">
   <p>© 2025 開發者：Lîm A-kâu（林阿猴）& Kim Chio（金蕉），供免費教學及學習使用。</p>
 </footer>
+
+  <!-- 載入 script.js -->
+  <script src="/static/script.js" defer></script>
+
 </body>
 </html>

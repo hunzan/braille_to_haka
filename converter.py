@@ -1,5 +1,6 @@
 import json
 import os
+import re
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE_DIR, 'brailletotl_data')
@@ -101,3 +102,31 @@ def braille_to_tl(braille_str):
         result.append(mapped)
 
     return ''.join(result)
+
+# 輔助函式：載入差異對照表
+def load_tl_to_poj_diff():
+    path = os.path.join(os.path.dirname(__file__), 'brailletotl_data', 'tl_to_poj_diff.json')
+    with open(path, 'r', encoding='utf-8') as f:
+        return json.load(f)
+
+# 主函式：台羅轉 POJ（根據差異表轉換）
+def convert_tl_to_poj(tl_text):
+    diff_table = load_tl_to_poj_diff()
+
+    tl_text = tl_text.replace("nn", "ⁿ")
+
+    sorted_items = sorted(diff_table.items(), key=lambda x: len(x[1]), reverse=True)
+    for poj_key, tl_value in sorted_items:
+        tl_text = tl_text.replace(tl_value, poj_key)
+
+    fix_map = {
+        "ⁿg": "nng",
+        "ⁿ̂g": "nn̂g",
+        "ⁿ̄g": "nn̄g",
+        "ⁿ̋g": "nn̆g",
+    }
+
+    for k, v in fix_map.items():
+        tl_text = tl_text.replace(k, v)
+
+    return tl_text

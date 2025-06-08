@@ -8,6 +8,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     const nasalCons = await (await fetch('/brailletotl_data/dottl_nasals_cons.json')).json();
     const nasalVowels = await (await fetch('/brailletotl_data/dottl_nasals_vowels.json')).json();
 
+    // 加入 POJ 差異表
+    const pojDiff = await (await fetch('/brailletotl_data/tl_to_poj_diff.json')).json();
+
     const multiCodeMap = {
       ...nasals,
       ...vowels,
@@ -54,6 +57,31 @@ document.addEventListener("DOMContentLoaded", async () => {
       return tokens;
     }
 
+    function convertTLtoPOJ(tlText, pojDiff) {
+      tlText = tlText.replace(/nn/g, "ⁿ");
+
+      const sortedDiff = Object.entries(pojDiff).sort((a, b) => b[1].length - a[1].length);
+      for (const [poj, tl] of sortedDiff) {
+        const regex = new RegExp(tl, 'g');
+        tlText = tlText.replace(regex, poj);
+      }
+
+      // 補救字典
+      const fixMap = {
+        "ⁿg": "nng",
+        "ⁿ̂g": "nn̂g",
+        "ⁿ̄g": "nn̄g",
+        "ⁿ̋g": "nn̆g",
+      };
+
+      for (const [key, val] of Object.entries(fixMap)) {
+        const regex = new RegExp(key, 'g');
+        tlText = tlText.replace(regex, val);
+      }
+
+      return tlText;
+    }
+
     // 元素綁定
     const inputBox = document.getElementById('inputText');
     const outputBox = document.getElementById('outputText');
@@ -65,91 +93,101 @@ document.addEventListener("DOMContentLoaded", async () => {
     const bgColorPicker = document.getElementById('bgColor');
     const textColorPicker = document.getElementById('textColor');
     const copyStatus = document.getElementById('copyStatus');
+    const outputFormatSelect = document.getElementById('outputMode');
 
-  convertBtn.onclick = () => {
-    const brailleStr = inputBox.value;
-    const tokens = tokenize(brailleStr);
+    convertBtn.onclick = () => {
+      const brailleStr = inputBox.value;
+      const tokens = tokenize(brailleStr);
 
-    let i = 0;
-    const partialResult = [];
+      let i = 0;
+      const partialResult = [];
 
-    while (i < tokens.length) {
-      const char = tokens[i];
+      while (i < tokens.length) {
+        const char = tokens[i];
 
-      if (char === '\n') {
-        partialResult.push('\n');
-        i++;
-        continue;
-      }
-      if (char === ' ') {
-        partialResult.push(' ');
-        i++;
-        continue;
-      }
+        if (char === '\n') {
+          partialResult.push('\n');
+          i++;
+          continue;
+        }
+        if (char === ' ') {
+          partialResult.push(' ');
+          i++;
+          continue;
+        }
 
-      let mapped = '';
+        let mapped = '';
 
-      if (nasalCons[char]) {
-        const next = tokens[i + 1];
-        if (next && nasalVowels[next]) {
-          mapped = nasalCons[char] + nasalVowels[next];
-          i += 2;
+        if (nasalCons[char]) {
+          const next = tokens[i + 1];
+          if (next && nasalVowels[next]) {
+            mapped = nasalCons[char] + nasalVowels[next];
+            i += 2;
+          } else {
+            mapped = '?';
+            i++;
+          }
+        } else if (consonants[char]) {
+          const next = tokens[i + 1];
+          if (next && vowels[next]) {
+            mapped = consonants[char] + vowels[next];
+            i += 2;
+          } else if (next && rushio[next]) {
+            mapped = consonants[char] + rushio[next];
+            i += 2;
+          } else if (next && (nasals[next] || nasalCons[next] || nasalVowels[next])) {
+            mapped = '?';
+            i += 2;
+          } else {
+            mapped = consonants[char];
+            i += 1;
+          }
+        } else if (vowels[char]) {
+          mapped = vowels[char];
+          i++;
+        } else if (nasalVowels[char] || nasalCons[char]) {
+          mapped = '?';
+          i++;
+        } else if (nasals[char]) {
+          mapped = nasals[char];
+          i++;
+        } else if (rushio[char]) {
+          mapped = rushio[char];
+          i++;
         } else {
           mapped = '?';
           i++;
         }
-      } else if (consonants[char]) {
-        const next = tokens[i + 1];
-        if (next && vowels[next]) {
-          mapped = consonants[char] + vowels[next];
-          i += 2;
-        } else if (next && rushio[next]) {
-          mapped = consonants[char] + rushio[next];
-          i += 2;
-        } else if (next && (nasals[next] || nasalCons[next] || nasalVowels[next])) {
-          mapped = '?';
-          i += 2;
-        } else {
-          mapped = consonants[char];
-          i += 1;
+
+        const nextToken = tokens[i] || '';
+        if (mapped && nextToken !== ' ' && nextToken !== '\n' && nextToken !== '') {
+          mapped += '-';
         }
-      } else if (vowels[char]) {
-        mapped = vowels[char];
-        i++;
-      } else if (nasalVowels[char] || nasalCons[char]) {
-        mapped = '?';
-        i++;
-      } else if (nasals[char]) {
-        mapped = nasals[char];
-        i++;
-      } else if (rushio[char]) {
-        mapped = rushio[char];
-        i++;
-      } else {
-        mapped = '?';
-        i++;
+
+        partialResult.push(mapped);
       }
 
-      const nextToken = tokens[i] || '';
-      // 加上 - 號，只要後面不是空格或換行
-      if (mapped && nextToken !== ' ' && nextToken !== '\n' && nextToken !== '') {
-        mapped += '-';
+      // 先組合成台羅文字
+      const tlResult = partialResult.join('');
+
+      // 判斷使用者選擇是否要輸出 POJ
+      const outputFormat = outputFormatSelect.value;
+      let finalResult = tlResult;
+
+      if (outputFormat === 'poj') {
+        finalResult = convertTLtoPOJ(tlResult, pojDiff);
       }
 
-      partialResult.push(mapped);
-    }
+      outputBox.value = finalResult;
 
-    outputBox.value = partialResult.join('');
-
-        // 自動複製轉換結果
-    navigator.clipboard.writeText(outputBox.value).then(() => {
-      copyStatus.textContent = '已自動複製轉換結果！';
-      setTimeout(() => (copyStatus.textContent = ''), 3000);
-    }).catch(() => {
-      copyStatus.textContent = '複製失敗，請手動複製。';
-      setTimeout(() => (copyStatus.textContent = ''), 3000);
-    });
-  };
+      navigator.clipboard.writeText(finalResult).then(() => {
+        copyStatus.textContent = '已自動複製轉換結果！';
+        setTimeout(() => (copyStatus.textContent = ''), 3000);
+      }).catch(() => {
+        copyStatus.textContent = '複製失敗，請手動複製。';
+        setTimeout(() => (copyStatus.textContent = ''), 3000);
+      });
+    };
 
     copyBtn.onclick = () => {
       const text = outputBox.value;
