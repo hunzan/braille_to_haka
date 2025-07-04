@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>【蕉台點】羅馬拼音轉台語點字工具</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <!-- PayPal 購物車功能 -->
+  <script src="https://www.paypalobjects.com/ncp/cart/cart.js" data-merchant-id="8J8EN2UXS2LGA"></script>
+
+</head>
+<body class="bg-yellow-100 min-h-screen flex flex-col items-center p-6 font-sans">
+  <main class="flex-grow w-full max-w-3xl flex flex-col items-center">
+    <div class="donate-list w-full max-w-3xl space-y-4">
+
+    <h1 class="text-2xl font-bold mb-4" tabindex="0" align="center">多謝你 ê 贊助支持</h1>
+
+        <paypal-cart-button data-id="pp-view-cart"></paypal-cart-button>
+        <script>
+          cartPaypal.Cart({ id: "pp-view-cart" })
+        </script>
+
+          <paypal-add-to-cart-button data-id="4L2T4F2P452B4"></paypal-add-to-cart-button>
+          <script>cartPaypal.AddToCart({ id: "4L2T4F2P452B4" })</script>
+
+          <paypal-add-to-cart-button data-id="NXCHB2FSEYAPN"></paypal-add-to-cart-button>
+          <script>cartPaypal.AddToCart({ id: "NXCHB2FSEYAPN" })</script>
+
+         <paypal-add-to-cart-button data-id="JG9XBZZBSKAMU"></paypal-add-to-cart-button>
+            <script>
+              cartPaypal.AddToCart({ id: "JG9XBZZBSKAMU" })
+            </script>
+
+         <paypal-add-to-cart-button data-id="YQTY7ANHN7LWW"></paypal-add-to-cart-button>
+            <script>
+              cartPaypal.AddToCart({ id: "YQTY7ANHN7LWW" })
+            </script>
+     </div>
+  </main>
+
+  <!-- script -->
+  <script src="{{ url_for('static', filename='script.js') }}"></script>
+
+  <!-- footer -->
+  <footer role="contentinfo" class="mt-4 text-sm text-gray-500 text-center w-full" tabindex="0">
+    <p>© 2025 開發者：Lîm A-kâu（林阿猴）& Kim Chio（金蕉），供免費教學及學習使用。</p>
+  </footer>
+
+</body>
+</html>
