@@ -6,6 +6,33 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>【蕉台點】台語點字轉羅馬拼音工具</title>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+
+      <style>
+  .btn {
+    display: inline-block;
+    font-size: 14px;
+    padding: 10px 20px;
+    min-width: 150px;
+    border: none;
+    color: white;
+    background-color: #AE57A4;
+    text-decoration: none;
+    cursor: pointer;
+    border-radius: 6px;
+    text-align: center;
+    margin: 8px 5px;
+    transition: background-color 0.3s ease;
+  }
+
+  .btn:hover {
+    background-color: #7E3D76;
+  }
+
+  .donate-buttons {
+    text-align: center;
+  }
+  </style>
+
 </head>
 <body class="bg-yellow-100 min-h-screen flex flex-col items-center p-4 font-sans">
 <main class="flex-grow w-full flex flex-col items-center">
@@ -78,12 +105,26 @@
           aria-live="polite"
           role="textbox"
           tabindex="0"></textarea>
+    </div>
   </div>
 
   <!-- 複製狀態訊息 -->
   <p id="copyStatus" class="mt-4 text-sm text-gray-700" aria-live="polite"></p>
 
-  </div>
+         <div class="donate-buttons">
+      <a href="https://www.paypal.me/AkauKimchio" target="_blank" class="btn">
+        🧋 請我們喝珍奶
+      </a>
+      <a href="https://www.paypal.me/AkauKimchio" target="_blank" class="btn">
+        🍌 請我們吃香蕉
+      </a>
+      <a href="https://www.paypal.me/AkauKimchio" target="_blank" class="btn">
+        🍱 請我們吃便當
+      </a>
+      <a href="https://www.paypal.me/AkauKimchio" target="_blank" class="btn">
+        🥤 請我們喝拿鐵
+      </a>
+    </div>
 </main>
 
 <!-- Footer：緊貼底部區塊 -->
