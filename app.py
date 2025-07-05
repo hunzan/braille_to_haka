@@ -27,5 +27,9 @@ def convert():
 def braille_data(filename):
     return send_from_directory('brailletotl_data', filename)
 
+@app.route('/support_us')
+def support_us():
+    return render_template('support_us.html')
+
 if __name__ == '__main__':
     app.run(debug=True)
