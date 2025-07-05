@@ -8,6 +8,24 @@
   <!-- PayPal 購物車功能 -->
   <script src="https://www.paypalobjects.com/ncp/cart/cart.js" data-merchant-id="8J8EN2UXS2LGA"></script>
 
+    <script>
+    paypal.Buttons({
+      createOrder: function (data, actions) {
+        return fetch("/ncp/api/create-order", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ items: [{ id: 1, name: "捐款", amount: 10 }] }),
+        })
+        .then((res) => res.json())
+        .then((order) => order.id);
+      },
+      onApprove: function (data, actions) {
+        // 付款成功後的處理
+        console.log("訂單完成", data);
+      }
+    }).render("#paypal-button-container");
+    </script>
+
 </head>
 <body class="bg-yellow-100 min-h-screen flex flex-col items-center p-6 font-sans">
   <main class="flex-grow w-full max-w-3xl flex flex-col items-center">
