@@ -18,6 +18,7 @@
 git clone https://github.com/yourname/hakka-braille-to-pinyin.git
 cd hakka-braille-to-pinyin
 pip install -r requirements.txt  # 如果有需求套件
+```
 
 ## 🛠️ 開發與貢獻
 
