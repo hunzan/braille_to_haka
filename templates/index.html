@@ -4,12 +4,9 @@
   <link rel="icon" href="/static/taivi.ico" type="image/x-icon">
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>【蕉台點】台語點字轉羅馬拼音工具</title>
+  <title>【蕉客點】客語點字轉台灣客語拼音工具</title>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-  <!-- PayPal 購物車功能 -->
-  <script src="https://www.paypalobjects.com/ncp/cart/cart.js" data-merchant-id="8J8EN2UXS2LGA"></script>
-
-      <style>
+  <style>
   .btn {
     display: inline-block;
     font-size: 14px;
@@ -38,21 +35,22 @@
 </head>
 <body class="bg-yellow-100 min-h-screen flex flex-col items-center p-4 font-sans">
 <main class="flex-grow w-full flex flex-col items-center">
-  <h1 class="text-2xl font-bold mb-4" tabindex="0">蕉台點🍌台語點字轉羅馬拼音</h1>
+  <h1 class="text-2xl font-bold mb-4" tabindex="0">蕉客點🍌客語點字轉台灣客語拼音</h1>
 
-    <a href="https://taitobraillewebapi-production.up.railway.app/">
+    <a href="https://haka-to-braille.onrender.com/">
       <button style="background-color: #4CAF50; color: white;
                      padding: 6px 12px; font-size: 14px;
                      border: none; border-radius: 6px; cursor: pointer;">
-        羅馬拼音轉台語點字
+        來去用台灣客語拼音轉客語點字
       </button>
     </a>
 
   <!-- 使用說明 -->
   <section id="usage" class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-2 mb-2 w-full max-w-6xl text-sm rounded"
            role="region" aria-labelledby="usageTitle" tabindex="0">
-    <p>1. 請輸入符合規則的台語點字（例：⠛⠺⠂ ⠎⠊⠒ ⠙⠜⠆⠻⠆⠇⠭⠆），系統將轉換為對應台羅拼音／POJ（自選）。</p>
-    <p>2. 「om」、「uang」及「標點符號」尚未確定點字規則，請以空格或斷行做分隔。</p>
+    <p><strong>本線上工具所採用的點字規則，參照台灣苗栗視障巡迴輔導教師李文煥老師所研發的點字規則。</strong></p>
+    <p><strong>1. 請輸入符合規則的客語點字（例：⠬⠺⠆ ⠓⠑⠤ ⠞⠪⠆ ⠧⠧⠆ ⠬⠹⠆），系統將轉換為對應腔調的台灣客語拼音。</strong></p>
+    <p><strong>2. 「客語點字標點符號」尚未確定規則，詞與詞、句與句之間請以空格代替做分隔。</strong></p>
   </section>
 
    <!-- 功能設定一整排：顏色 + 字體 + 輸出格式 -->
@@ -73,14 +71,20 @@
       <input type="range" id="fontSizeSlider" min="14" max="60" value="20" class="w-32" aria-labelledby="fontSizeLabel">
       <span id="fontSizeValue" class="ml-2 text-gray-600">20px</span>
     </div>
-    <!-- 輸出格式選單 -->
+
+    <!-- 輸出腔調選單 -->
     <div class="flex items-center">
-      <label for="outputMode" class="mr-2">輸出格式：</label>
-      <select id="outputMode" class="p-2 border rounded bg-white">
-        <option value="tl">台羅（TL）</option>
-        <option value="poj">白話字（POJ）</option>
+      <label for="outputMode" class="mr-2">輸出腔調：</label>
+      <select id="outputMode" name="dialect" class="p-2 border rounded bg-white">
+        <option value="siian2">四縣腔</option>
+        <option value="namsiian2">南四縣腔</option>
+        <option value="hailuk">海陸腔</option>
+        <option value="tapu">大埔腔</option>
+        <option value="ngiauphin">饒平腔</option>
+        <option value="choaan">詔安腔</option>
       </select>
     </div>
+
   </div>
 
     <!-- 三欄功能排版容器 -->
@@ -89,7 +93,7 @@
     <!-- 左欄輸入 -->
     <textarea id="inputText"
           class="w-full md:w-1/2 p-2 border rounded resize-y h-48 leading-relaxed"
-          placeholder="請輸入台語點字（例：⠛⠺⠂ ⠎⠊⠒ ⠙⠜⠆⠻⠆⠇⠭⠆）..."></textarea>
+          placeholder="請輸入客語點字（例：⠬⠺⠆ ⠓⠑⠤ ⠞⠪⠆ ⠧⠧⠆ ⠬⠹⠆）..."></textarea>
 
     <!-- 中間按鈕 -->
     <div class="flex flex-col justify-center items-center gap-2 w-full md:w-1/12">
@@ -102,8 +106,8 @@
     <textarea id="outputText"
           class="w-full md:w-1/2 p-2 border rounded resize-y h-48 leading-relaxed"
           readonly
-          placeholder="台語羅馬字會顯示在這裡..."
-          aria-label="轉換結果：台羅拼音或白話字POJ"
+          placeholder="客語拼音會顯示在這裡..."
+          aria-label="轉換結果：對應腔調的客語拼音"
           aria-live="polite"
           role="textbox"
           tabindex="0"></textarea>

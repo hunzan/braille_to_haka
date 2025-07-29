@@ -1,132 +1,152 @@
 import json
 import os
-import re
-
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_DIR = os.path.join(BASE_DIR, 'brailletotl_data')
 
 def load_json(filename):
-    with open(os.path.join(DATA_DIR, filename), encoding='utf-8') as f:
+    base_path = os.path.join(os.path.dirname(__file__), 'braille_data')
+    with open(os.path.join(base_path, filename), encoding='utf-8') as f:
         return json.load(f)
 
-# 載入資料表
-consonants = load_json('dottl_consonants.json')         # 純子音
-vowels = load_json('dottl_vowels.json')                 # 純母音
-nasals = load_json('dottl_nasals.json')                 # 鼻音韻尾與促音
-rushio = load_json('dottl_rushio.json')                 # 鼻化韻尾
-nasal_cons = load_json('dottl_nasals_cons.json')        # 鼻音子音
-nasal_vowels = load_json('dottl_nasals_vowels.json')    # 鼻音母音
+def load_json_keys_sorted(data_dict):
+    # 依 key 長度由長到短排序
+    return sorted(data_dict.keys(), key=len, reverse=True)
 
-def tokenize_braille(braille_str):
-    return list(braille_str)  # 不 strip()
+def match_from_dict(text, start, candidates):
+    # 從 text[start:] 嘗試比對候選 key，成功就回傳 (匹配長度, key)，否則 (0, None)
+    for candidate in candidates:
+        length = len(candidate)
+        if text.startswith(candidate, start):
+            return length, candidate
+    return 0, None
 
-def braille_to_tl(braille_str):
-    # 將 Unicode 點字空格（\u2800）轉為一般空格
-    braille_str = braille_str.replace('\u2800', ' ')
-    tokens = tokenize_braille(braille_str)
-    result = []
-    i = 0
+def assemble_syllable(syllable):
+    parts = [
+        "".join(syllable.get("initial", [])) if isinstance(syllable.get("initial", ""), list) else str(syllable.get("initial", "")),
+        "".join(syllable.get("vowel", [])) if isinstance(syllable.get("vowel", ""), list) else str(syllable.get("vowel", "")),
+        "".join(syllable.get("rushio", [])) if isinstance(syllable.get("rushio", ""), list) else str(syllable.get("rushio", "")),
+        "".join(syllable.get("tone", [])) if isinstance(syllable.get("tone", ""), list) else str(syllable.get("tone", ""))
+    ]
+    return ''.join(parts)
 
-    while i < len(tokens):
-        char = tokens[i]
+def get_rushio_value(key, dialect, rushio_dict):
+    # 根據腔調取出拼音值，支援巢狀格式的 JSON，如：
+    # "⠼⠔": { "default": "ab", "tapu": "abˋ", "choaan": "abˊ" }
+    if key not in rushio_dict:
+        return None
+    entry = rushio_dict[key]
+    if isinstance(entry, dict):
+        return entry.get(dialect, entry.get("default"))
+    else:
+        return entry  # fallback for舊格式
 
-        # 6. 空格 / 換行（以字元為準）
-        if char == '\n':
-            result.append('\n')
-            i += 1
-            continue
-        elif char == ' ':
-            result.append(' ')
-            i += 1
-            continue
+def convert_braille_to_pinyin(braille_text, dialect):
+    # 載入共用資料
+    vowels = load_json('dot_vowels.json')
+    rushio = load_json('dot_rushio_syllables.json')
+    special_cases = load_json('dot_special.json')
 
-        mapped = ''
-
-        # 1. 鼻音子音 + 鼻音母音：必須配對，否則 ?
-        if char in nasal_cons:
-            if i + 1 < len(tokens) and tokens[i + 1] in nasal_vowels:
-                mapped = nasal_cons[char] + nasal_vowels[tokens[i + 1]]
-                i += 2
-            else:
-                mapped = '?'
-                i += 1
-
-        # 2. 純子音：可單獨，或接純母音 / 促音；接鼻音類→ ?
-        elif char in consonants:
-            if i + 1 < len(tokens):
-                next_char = tokens[i + 1]
-                if next_char in vowels | rushio:
-                    mapped = consonants[char] + (
-                        vowels.get(next_char) or rushio.get(next_char)
-                    )
-                    i += 2
-                elif next_char in (nasals | nasal_cons | nasal_vowels):
-                    mapped = '?'
-                    i += 2
-                else:
-                    mapped = consonants[char]
-                    i += 1
-            else:
-                mapped = consonants[char]
-                i += 1
-
-        # 3. 純母音或促音 / 入聲：可單獨存在
-        elif char in vowels:
-            mapped = vowels[char]
-            i += 1
-
-        elif char in rushio:
-            mapped = rushio[char]
-            i += 1
-
-        # 4. 鼻音母音或鼻音子音：單獨出現都錯
-        elif char in nasal_vowels or char in nasal_cons:
-            mapped = '?'
-            i += 1
-
-        # 5. 純鼻音：只能單獨存在，前不能有子音組合
-        elif char in nasals:
-            mapped = nasals[char]
-            i += 1
-
-        # 7. 其他不明符號
-        else:
-            mapped = '?'
-            i += 1
-
-        # 判斷是否加 -
-        next_token = tokens[i] if i < len(tokens) else ''
-        if mapped and next_token not in {' ', '\n', ''}:
-            mapped += '-'
-
-        result.append(mapped)
-
-    return ''.join(result)
-
-# 輔助函式：載入差異對照表
-def load_tl_to_poj_diff():
-    path = os.path.join(os.path.dirname(__file__), 'brailletotl_data', 'tl_to_poj_diff.json')
-    with open(path, 'r', encoding='utf-8') as f:
-        return json.load(f)
-
-# 主函式：台羅轉 POJ（根據差異表轉換）
-def convert_tl_to_poj(tl_text):
-    diff_table = load_tl_to_poj_diff()
-
-    tl_text = tl_text.replace("nn", "ⁿ")
-
-    sorted_items = sorted(diff_table.items(), key=lambda x: len(x[1]), reverse=True)
-    for poj_key, tl_value in sorted_items:
-        tl_text = tl_text.replace(tl_value, poj_key)
-
-    fix_map = {
-        "ⁿg": "nng",
-        "ⁿ̂g": "nn̂g",
-        "ⁿ̄g": "nn̄g",
-        "ⁿ̋g": "nn̆g",
+    dialect_map = {
+        'siian2': '四縣腔',
+        'namsiian2': '南四縣腔',
+        'hailuk': '海陸腔',
+        'tapu': '大埔腔',
+        'ngiauphin': '饒平腔',
+        'choaan': '詔安腔'
     }
 
-    for k, v in fix_map.items():
-        tl_text = tl_text.replace(k, v)
+    human_dialect = dialect_map.get(dialect, None)
+    if human_dialect is None:
+        return '⚠️ 無此腔調配置'
 
-    return tl_text
+    if human_dialect in ['四縣腔', '南四縣腔']:
+        consonants = load_json('dot_consonants_siian2.json')
+        tones = load_json('dot_tone_siian2.json')
+    else:
+        consonants = load_json('dot_consonants_hpzt.json')
+        tones = load_json('dot_tone_hpzt.json')
+
+    # 先整理 key 長度順序（長 ➜ 短）
+    special_keys = load_json_keys_sorted(special_cases)
+    consonants_keys = load_json_keys_sorted(consonants)
+    vowels_keys = load_json_keys_sorted(vowels)
+    rushio_keys = load_json_keys_sorted(rushio)
+    tones_keys = load_json_keys_sorted(tones)
+
+    result = []
+    current_syllable = {"initial": "", "vowel": "", "rushio": "", "tone": ""}
+
+    i = 0
+    length = len(braille_text)
+    while i < length:
+        # ✅ 特殊點字：允許前面已有子音 initial
+        special_len, special_match = match_from_dict(braille_text, i, special_keys)
+        if special_len > 0:
+            special_value = special_cases[special_match]
+
+            if current_syllable["initial"]:  # 若已有子音
+                current_syllable["vowel"] = special_value
+                result.append(assemble_syllable(current_syllable))
+                current_syllable = {"initial": "", "vowel": "", "rushio": "", "tone": ""}
+            else:
+                # 沒有子音時整組當獨立音節使用
+                result.append(special_value)
+
+            i += special_len
+            continue
+
+        # 拼音 rushio（如 ⠔=d、⠢=bˋ）：直接作為音節尾，並結束音節
+        rushio_len, rushio_match = match_from_dict(braille_text, i, rushio_keys)
+        if rushio_len > 0:
+            rushio_value = get_rushio_value(rushio_match, dialect, rushio)
+
+            if rushio_value:
+                current_syllable["rushio"] = rushio_value
+                i += rushio_len
+                continue
+
+        # 聲母
+        cons_len, cons_match = match_from_dict(braille_text, i, consonants_keys)
+        if cons_len > 0:
+            if not any(current_syllable.values()):
+                current_syllable["initial"] = consonants[cons_match]
+                i += cons_len
+                continue
+
+        # 元音處理區
+        vowel_len, vowel_match = match_from_dict(braille_text, i, vowels_keys)
+        if vowel_len > 0:
+            if vowel_match == '⠔':
+                prev_char = braille_text[i - 1] if i > 0 else ''
+                if prev_char in ['⠵', '⠉', '⠎']:  # z, c, s 的點字
+                    current_syllable["vowel"] = "ii"
+                else:
+                    current_syllable["vowel"] = "ua"
+            else:
+                current_syllable["vowel"] = vowels[vowel_match]
+            i += vowel_len
+            continue
+
+        # 尾音區塊：可能是 rushio（⠔、⠢）或 tone
+        tail_len, tail_match = match_from_dict(braille_text, i, tones_keys)
+        if tail_len > 0:
+            if tail_match in rushio:
+                rushio_value = get_rushio_value(tail_match, dialect, rushio)
+                if rushio_value:
+                    current_syllable["rushio"] = rushio_value
+                result.append(assemble_syllable(current_syllable))
+                current_syllable = {"initial": "", "vowel": "", "rushio": "", "tone": ""}
+            else:
+                current_syllable["tone"] = tones[tail_match]
+            i += tail_len
+            continue
+
+        # 例外字元：當作分隔符號
+        if any(current_syllable.values()):
+            result.append(assemble_syllable(current_syllable))
+            current_syllable = {"initial": "", "vowel": "", "rushio": "", "tone": ""}
+        result.append(braille_text[i])
+        i += 1
+
+    if any(current_syllable.values()):
+        result.append(assemble_syllable(current_syllable))
+
+    return ''.join(result)
