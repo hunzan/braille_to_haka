@@ -101,20 +101,23 @@ def convert_braille_to_pinyin(braille_text, dialect):
             i += 2
             continue
 
-        # ✅ 特殊點字：允許前面已有子音 initial
+        # ✅ 特殊點字處理：允許前面已有子音，也允許後面只可接 tone
         special_len, special_match = match_from_dict(braille_text, i, special_keys)
         if special_len > 0:
             special_value = special_cases[special_match]
-
-            if current_syllable["initial"]:  # 若已有子音
-                current_syllable["vowel"] = special_value
-                result.append(assemble_syllable(current_syllable))
-                current_syllable = {"initial": "", "vowel": "", "rushio": "", "tone": ""}
-            else:
-                # 沒有子音時整組當獨立音節使用
-                result.append(special_value)
-
+            current_syllable["vowel"] = special_value
             i += special_len
+
+            # 檢查下一個字元是否為 tone（聲調）
+            if i < length:
+                tone_len, tone_match = match_from_dict(braille_text, i, tones_keys)
+                if tone_len > 0:
+                    current_syllable["tone"] = tones[tone_match]
+                    i += tone_len
+
+            # 音節結束，組成並加入結果
+            result.append(assemble_syllable(current_syllable))
+            current_syllable = {"initial": "", "vowel": "", "rushio": "", "tone": "", "nasal": False}
             continue
 
         # 拼音 rushio（如 ⠔=d、⠢=bˋ）：直接作為音節尾，並結束音節
