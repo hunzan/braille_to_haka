@@ -150,6 +150,28 @@ def convert_braille_to_pinyin(braille_text, dialect):
             else:
                 current_syllable["vowel"] = vowels[vowel_match]
             i += vowel_len
+
+            # ✅ 處理「母音 + 韻尾子音 + 音調」
+            if i < length:
+                # 嘗試抓韻尾子音（但不是 rushio）
+                final_cons_len, final_cons_match = match_from_dict(braille_text, i, consonants_keys)
+                if final_cons_len > 0:
+                    next_char = braille_text[i + final_cons_len] if i + final_cons_len < length else ''
+                    # 若子音後面是 tone，代表這子音是韻尾用的，不是下個音節的聲母
+                    if next_char in tones:
+                        current_syllable["rushio"] = consonants[final_cons_match]  # 當作韻尾使用
+                        i += final_cons_len
+
+            # ✅ 嘗試抓音調 tone
+            if i < length:
+                tone_len, tone_match = match_from_dict(braille_text, i, tones_keys)
+                if tone_len > 0:
+                    current_syllable["tone"] = tones[tone_match]
+                    i += tone_len
+
+            # 音節結束
+            result.append(assemble_syllable(current_syllable))
+            current_syllable = {"initial": "", "vowel": "", "rushio": "", "tone": "", "nasal": False}
             continue
 
         # 尾音區塊：可能是 rushio（⠔、⠢）或 tone
