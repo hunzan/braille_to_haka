@@ -41,7 +41,6 @@ def get_rushio_value(key, dialect, rushio_dict):
         return entry  # fallback for舊格式
 
 def convert_braille_to_pinyin(braille_text, dialect):
-    # 載入共用資料
     vowels = load_json('dot_vowels.json')
     rushio = load_json('dot_rushio_syllables.json')
     special_cases = load_json('dot_special.json')
@@ -66,7 +65,6 @@ def convert_braille_to_pinyin(braille_text, dialect):
         consonants = load_json('dot_consonants_hpzt.json')
         tones = load_json('dot_tone_hpzt.json')
 
-    # 先整理 key 長度順序（長 ➜ 短）
     special_keys = load_json_keys_sorted(special_cases)
     consonants_keys = load_json_keys_sorted(consonants)
     vowels_keys = load_json_keys_sorted(vowels)
@@ -74,76 +72,66 @@ def convert_braille_to_pinyin(braille_text, dialect):
     tones_keys = load_json_keys_sorted(tones)
 
     result = []
-    current_syllable = {"initial": "", "vowel": "", "rushio": "", "tone": ""}
+    current_syllable = {"initial": "", "vowel": "", "rushio": "", "tone": "", "nasal": False}
 
     i = 0
     length = len(braille_text)
     while i < length:
-        # 鼻音宣告：點字第六點 ⠠ 出現在音節開頭，標示鼻音（nn）
         if braille_text[i] == '⠠':
-            # 若當前音節還是空的，則標記鼻音（之後拼好音節再加）
-            if not any(current_syllable.values()):
-                current_syllable["nasal"] = True  # 自定欄位 nasal
+            # 僅當前音節未開始時，才標記鼻音
+            if not any(v for k, v in current_syllable.items() if k != "nasal"):
+                current_syllable["nasal"] = True
                 i += 1
                 continue
 
-        # 特判：⠗ 為 er 的條件：前面為空格或開頭，後面接 tone，然後是空格或句尾
         if (
-                braille_text[i] == '⠗' and
-                (i == 0 or braille_text[i - 1] == ' ') and
-                (i + 1 < length and braille_text[i + 1] in tones) and
-                (i + 2 == length or braille_text[i + 2] == ' ')
+            braille_text[i] == '⠗' and
+            (i == 0 or braille_text[i - 1] == ' ') and
+            (i + 1 < length and braille_text[i + 1] in tones) and
+            (i + 2 == length or braille_text[i + 2] == ' ')
         ):
             current_syllable["vowel"] = "er"
             current_syllable["tone"] = tones[braille_text[i + 1]]
             result.append(assemble_syllable(current_syllable))
-            current_syllable = {"initial": "", "vowel": "", "rushio": "", "tone": ""}
+            current_syllable = {"initial": "", "vowel": "", "rushio": "", "tone": "", "nasal": False}
             i += 2
             continue
 
-        # ✅ 特殊點字處理：允許前面已有子音，也允許後面只可接 tone
         special_len, special_match = match_from_dict(braille_text, i, special_keys)
         if special_len > 0:
-            special_value = special_cases[special_match]
-            current_syllable["vowel"] = special_value
+            current_syllable["vowel"] = special_cases[special_match]
             i += special_len
 
-            # 檢查下一個字元是否為 tone（聲調）
             if i < length:
                 tone_len, tone_match = match_from_dict(braille_text, i, tones_keys)
                 if tone_len > 0:
                     current_syllable["tone"] = tones[tone_match]
                     i += tone_len
 
-            # 音節結束，組成並加入結果
             result.append(assemble_syllable(current_syllable))
             current_syllable = {"initial": "", "vowel": "", "rushio": "", "tone": "", "nasal": False}
             continue
 
-        # 拼音 rushio（如 ⠔=d、⠢=bˋ）：直接作為音節尾，並結束音節
         rushio_len, rushio_match = match_from_dict(braille_text, i, rushio_keys)
         if rushio_len > 0:
             rushio_value = get_rushio_value(rushio_match, dialect, rushio)
-
             if rushio_value:
                 current_syllable["rushio"] = rushio_value
                 i += rushio_len
                 continue
 
-        # 聲母
         cons_len, cons_match = match_from_dict(braille_text, i, consonants_keys)
         if cons_len > 0:
-            if not any(current_syllable.values()):
+            if not any(v for k, v in current_syllable.items() if k != "nasal"):
                 current_syllable["initial"] = consonants[cons_match]
                 i += cons_len
                 continue
 
-        # 元音處理區
         vowel_len, vowel_match = match_from_dict(braille_text, i, vowels_keys)
         if vowel_len > 0:
             if vowel_match == '⠔':
                 prev_char = braille_text[i - 1] if i > 0 else ''
-                if prev_char in ['⠵', '⠉', '⠎']:  # z, c, s 的點字
+                if prev_char in ['⠵', '⠉', '⠎']:
                     current_syllable["vowel"] = "ii"
                 else:
                     current_syllable["vowel"] = "ua"
@@ -151,30 +139,24 @@ def convert_braille_to_pinyin(braille_text, dialect):
                 current_syllable["vowel"] = vowels[vowel_match]
             i += vowel_len
 
-            # ✅ 處理「母音 + 韻尾子音 + 音調」
             if i < length:
-                # 嘗試抓韻尾子音（但不是 rushio）
                 final_cons_len, final_cons_match = match_from_dict(braille_text, i, consonants_keys)
                 if final_cons_len > 0:
                     next_char = braille_text[i + final_cons_len] if i + final_cons_len < length else ''
-                    # 若子音後面是 tone，代表這子音是韻尾用的，不是下個音節的聲母
                     if next_char in tones:
-                        current_syllable["rushio"] = consonants[final_cons_match]  # 當作韻尾使用
+                        current_syllable["rushio"] = consonants[final_cons_match]
                         i += final_cons_len
 
-            # ✅ 嘗試抓音調 tone
             if i < length:
                 tone_len, tone_match = match_from_dict(braille_text, i, tones_keys)
                 if tone_len > 0:
                     current_syllable["tone"] = tones[tone_match]
                     i += tone_len
 
-            # 音節結束
             result.append(assemble_syllable(current_syllable))
             current_syllable = {"initial": "", "vowel": "", "rushio": "", "tone": "", "nasal": False}
             continue
 
-        # 尾音區塊：可能是 rushio（⠔、⠢）或 tone
         tail_len, tail_match = match_from_dict(braille_text, i, tones_keys)
         if tail_len > 0:
             if tail_match in rushio:
@@ -182,20 +164,20 @@ def convert_braille_to_pinyin(braille_text, dialect):
                 if rushio_value:
                     current_syllable["rushio"] = rushio_value
                 result.append(assemble_syllable(current_syllable))
-                current_syllable = {"initial": "", "vowel": "", "rushio": "", "tone": ""}
+                current_syllable = {"initial": "", "vowel": "", "rushio": "", "tone": "", "nasal": False}
             else:
                 current_syllable["tone"] = tones[tail_match]
             i += tail_len
             continue
 
-        # 例外字元：當作分隔符號
-        if any(current_syllable.values()):
+        if any(v for k, v in current_syllable.items() if k != "nasal"):
             result.append(assemble_syllable(current_syllable))
-            current_syllable = {"initial": "", "vowel": "", "rushio": "", "tone": ""}
+            current_syllable = {"initial": "", "vowel": "", "rushio": "", "tone": "", "nasal": False}
+
         result.append(braille_text[i])
         i += 1
 
-    if any(current_syllable.values()):
+    if any(v for k, v in current_syllable.items() if k != "nasal"):
         result.append(assemble_syllable(current_syllable))
 
     return ''.join(result)
