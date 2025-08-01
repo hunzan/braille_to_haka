@@ -44,6 +44,8 @@ def convert_braille_to_pinyin(braille_text, dialect):
     vowels = load_json('dot_vowels.json')
     rushio = load_json('dot_rushio_syllables.json')
     special_cases = load_json('dot_special.json')
+    punctuations = load_json('dot_punctuation.json')
+    punctuation_keys = load_json_keys_sorted(punctuations)
 
     dialect_map = {
         'siian2': '四縣腔',
@@ -153,6 +155,16 @@ def convert_braille_to_pinyin(braille_text, dialect):
                     current_syllable["tone"] = tones[tone_match]
                     i += tone_len
 
+                    # ➕ Tone 結束後立即檢查標點
+                    if i < length:
+                        punct_len, punct_match = match_from_dict(braille_text, i, punctuation_keys)
+                        if punct_len > 0:
+                            result.append(assemble_syllable(current_syllable))
+                            current_syllable = {"initial": "", "vowel": "", "rushio": "", "tone": "", "nasal": False}
+                            result.append(punctuations[punct_match])
+                            i += punct_len
+                            continue
+
             result.append(assemble_syllable(current_syllable))
             current_syllable = {"initial": "", "vowel": "", "rushio": "", "tone": "", "nasal": False}
             continue
@@ -174,8 +186,19 @@ def convert_braille_to_pinyin(braille_text, dialect):
             result.append(assemble_syllable(current_syllable))
             current_syllable = {"initial": "", "vowel": "", "rushio": "", "tone": "", "nasal": False}
 
-        result.append(braille_text[i])
-        i += 1
+        # 嘗試匹配標點符號
+        punct_len, punct_match = match_from_dict(braille_text, i, punctuation_keys)
+        if punct_len > 0:
+            result.append(punctuations[punct_match])
+            i += punct_len
+        else:
+            punct_len, punct_match = match_from_dict(braille_text, i, punctuation_keys)
+            if punct_len > 0:
+                result.append(punctuations[punct_match])
+                i += punct_len
+            else:
+                result.append(braille_text[i])
+                i += 1
 
     if any(v for k, v in current_syllable.items() if k != "nasal"):
         result.append(assemble_syllable(current_syllable))
