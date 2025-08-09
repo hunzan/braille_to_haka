@@ -79,21 +79,39 @@ def _prev_nonspace(text, pos):
         i -= 1
     return text[i] if i >= 0 else ''
 
-def _match_punctuation_with_context(text, i, punctuation_keys, tones_keys, rushio_keys, current_syllable, punct_map):
+def _match_punctuation_with_context(text, i, punctuation_keys, tones_keys, rushio_keys,
+                                    current_syllable, punct_map,
+                                    opening_braille_set=None, closing_braille_set=None):
     """
-    ★ 具有脈絡的標點判定：
+    具有脈絡的標點判定：
       1) 位置 i 能匹配某個標點鍵
       2) 前面只能是：起始/空格/ tone / rushio 結尾
-      3) 後面「第一個非空白」不可是 tone
-    符合才視為標點，否則當作拼音繼續。
+      3) 後面第一個非空白不可是 tone
+    ★ 特例：若命中「開括號」或「閉括號」集合，直接視為標點（避免被拼音誤吃）
     """
     # 嘗試匹配任何標點（含可帶尾空白的鍵）
     punct_len, punct_match = match_from_dict(text, i, punctuation_keys, allow_trailing_space=True)
     if punct_len == 0 or punct_match is None:
         return 0, None
 
-    # 若音節還在組裝中，先不把它當標點（會先把音節結束掉再來判定）
-    if _has_syllable_content(current_syllable):
+    # ★ 高優先級（收斂版）：括號類「在合理脈絡」才放行，避免與母音同形時誤殺
+    # ★ 高優先級（收斂版）：括號類「在合理脈絡」才放行，避免與母音同形時誤殺
+    if opening_braille_set and punct_match in opening_braille_set:
+        if not _has_syllable_content(current_syllable):  # 不在組音節中
+            prev_ch = _prev_nonspace(text, i)
+            # 前面是起始/空白/已確定的點字標點鍵（用 punct_map 的鍵判斷）
+            if prev_ch == '' or prev_ch == ' ' or prev_ch in punct_map:
+                next_ch = _peek_nonspace(text, i + punct_len)
+                # 開括號後面不能馬上是 tone（標點不帶 tone）
+                if not next_ch or next_ch not in tones_keys:
+                    return punct_len, punct_match
+        # 不符合上述脈絡 → 不強行放行，落回一般規則
+
+    if closing_braille_set and punct_match in closing_braille_set:
+        # 閉括號通常出現在音節後；只要不在組音節中就視為標點
+        if not _has_syllable_content(current_syllable):
+            return punct_len, punct_match
+        # 若正在組音節，先讓音節結束後再由外層流程處理，不在這裡硬判
         return 0, None
 
     # 前面脈絡：只能是起始/空格/ tone / rushio
@@ -102,15 +120,12 @@ def _match_punctuation_with_context(text, i, punctuation_keys, tones_keys, rushi
     if prev_ch == '' or prev_ch == ' ':
         prev_ok = True
     else:
-        # 前一個非空白字元若是 tone → 可
         if prev_ch in tones_keys:
             prev_ok = True
         else:
-            # 或者前面「恰好」以某個 rushio 鍵結尾 → 可
             _, rkey = _endswith_any(text, i, rushio_keys)
             if rkey is not None:
                 prev_ok = True
-
     if not prev_ok:
         return 0, None
 
@@ -119,7 +134,6 @@ def _match_punctuation_with_context(text, i, punctuation_keys, tones_keys, rushi
     if next_ch and next_ch in tones_keys:
         return 0, None
 
-    # 都符合 → 是標點
     return punct_len, punct_match
 
 # ---------- 組裝輸出 ----------
@@ -157,6 +171,12 @@ def convert_braille_to_pinyin(braille_text, dialect):
     special_cases = load_json('dot_special.json')
     punctuations = load_json('dot_punctuation.json')
 
+    # ★ 動態蒐集：這些明眼標點的「點字鍵」
+    opening_targets = {'『', '【', '（'}
+    closing_targets = {'】'}  # 若也想包含『」』）等，自己加進來
+    opening_braille_set = {k for k, v in punctuations.items() if v in opening_targets}
+    closing_braille_set = {k for k, v in punctuations.items() if v in closing_targets}
+
     punctuation_keys = load_json_keys_sorted(punctuations)
     special_punctuations_allow_prefix = ["⠴", "⠠⠴", "⠐⠜", "⠨⠜"]  # 保留，但會先走「脈絡判定」版
 
@@ -187,11 +207,14 @@ def convert_braille_to_pinyin(braille_text, dialect):
     tones_keys = load_json_keys_sorted(tones)
 
     # ★ 查表用（供分號短路與 bb 限制）
-    # ★ 查表用
     rushio_key_set = set(rushio_keys)
     rushio_max_len = max((len(k) for k in rushio_keys), default=0)
     tones_key_set  = set(tones_keys)
     tones_max_len  = max((len(k) for k in tones_keys),  default=0)
+
+    # 開/閉括號鍵：長到短排序，避免子串誤配
+    opening_braille_sorted = sorted(opening_braille_set, key=len, reverse=True)
+    closing_braille_sorted = sorted(closing_braille_set, key=len, reverse=True)
 
     result = []
     current_syllable = {"initial": "", "vowel": "", "rushio": "", "tone": "", "nasal": False}
@@ -200,6 +223,42 @@ def convert_braille_to_pinyin(braille_text, dialect):
     length = len(braille_text)
 
     while i < length:
+
+        # ★ 高優先級：句首 / 空白 / 點字空白 / 換行 後的「開括號」一定當標點
+        #   這三個：『(⠠⠦)、【(⠨⠣)、（(⠐⠣)
+        if i == 0 or braille_text[i - 1] in (' ', '\u2800', '\n', '\r'):
+            # 安全回退用：若 dot_punctuation.json 無對應鍵，給預設明眼符號
+            hard_open_map = {'⠠⠦': '『', '⠨⠣': '【', '⠐⠣': '（'}
+            matched_open_key = None
+            matched_open_len = 0
+
+            for open_key in ('⠠⠦', '⠨⠣', '⠐⠣'):
+                if braille_text.startswith(open_key, i):
+                    matched_open_key = open_key
+                    matched_open_len = len(open_key)
+                    break
+
+            if matched_open_key is not None:
+                if _has_syllable_content(current_syllable):
+                    result.append(assemble_syllable(current_syllable))
+                    current_syllable = {"initial": "", "vowel": "", "rushio": "", "tone": "", "nasal": False}
+                result.append(punctuations.get(matched_open_key, hard_open_map[matched_open_key]))
+                i += matched_open_len
+                continue
+
+        # ★ 高優先級：遇到「閉括號」鍵，直接當標點
+        matched_close = None
+        for k in closing_braille_sorted:
+            if braille_text.startswith(k, i):
+                matched_close = k
+                break
+        if matched_close is not None:
+            if _has_syllable_content(current_syllable):
+                result.append(assemble_syllable(current_syllable))
+                current_syllable = {"initial": "", "vowel": "", "rushio": "", "tone": "", "nasal": False}
+            result.append(punctuations[matched_close])  # 】（或你表裡定義的任一閉括號）
+            i += len(matched_close)
+            continue
 
         # ★ 高優先級：若 '⠆' 後為點字空格，且「前面是 rushio 或 tone」，視為分號 '；'
         if braille_text[i] == '⠆' and i + 1 < length and braille_text[i + 1] == '\u2800':
@@ -215,7 +274,9 @@ def convert_braille_to_pinyin(braille_text, dialect):
 
         # ★ (A) 標點：先用「脈絡判定」的方式辨識，避免把母音/聲母誤當標點
         punct_len, punct_match = _match_punctuation_with_context(
-            braille_text, i, punctuation_keys, tones_keys, rushio_keys, current_syllable, punctuations
+            braille_text, i, punctuation_keys, tones_keys, rushio_keys,
+            current_syllable, punctuations,
+            opening_braille_set, closing_braille_set
         )
         if punct_len > 0:
             # 若當前音節尚未輸出，先結束它（理論上 _match 已確保沒有在組裝中）
@@ -250,7 +311,9 @@ def convert_braille_to_pinyin(braille_text, dialect):
             else:
                 # 同樣檢查脈絡；不合規就不當標點
                 _plen, _pm = _match_punctuation_with_context(
-                    braille_text, i, punctuation_keys, tones_keys, rushio_keys, current_syllable, punctuations
+                    braille_text, i, punctuation_keys, tones_keys, rushio_keys,
+                    current_syllable, punctuations,
+                    opening_braille_set, closing_braille_set
                 )
                 if _plen > 0 and _pm == sp_match:
                     # 是標點
@@ -333,7 +396,9 @@ def convert_braille_to_pinyin(braille_text, dialect):
                 if i < length:
                     # 依脈絡判定是否標點
                     p_len, p_match = _match_punctuation_with_context(
-                        braille_text, i, punctuation_keys, tones_keys, rushio_keys, current_syllable, punctuations
+                        braille_text, i, punctuation_keys, tones_keys, rushio_keys,
+                        current_syllable, punctuations,
+                        opening_braille_set, closing_braille_set
                     )
                     if p_len > 0:
                         result.append(assemble_syllable(current_syllable))
@@ -417,7 +482,9 @@ def convert_braille_to_pinyin(braille_text, dialect):
                     # tone 後若接標點（脈絡判定）
                     if i < length:
                         p_len, p_match = _match_punctuation_with_context(
-                            braille_text, i, punctuation_keys, tones_keys, rushio_keys, current_syllable, punctuations
+                            braille_text, i, punctuation_keys, tones_keys, rushio_keys,
+                            current_syllable, punctuations,
+                            opening_braille_set, closing_braille_set
                         )
                         if p_len > 0:
                             result.append(assemble_syllable(current_syllable))
