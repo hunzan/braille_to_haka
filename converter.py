@@ -61,6 +61,16 @@ def _endswith_any(text, end_index, keys):
             return L, k
     return 0, None
 
+def _eat_spaces(text, i):
+    """
+    從位置 i 開始，往後吃掉所有的普通空白 ' '、點字空格 '\u2800'、換行 '\n'、'\r'。
+    回傳吃掉的字元數（讓呼叫端用 i += ...）
+    """
+    count = 0
+    while i + count < len(text) and text[i + count] in (' ', '\u2800', '\n', '\r'):
+        count += 1
+    return count
+
 def _is_tone_char(ch, tones_dict):
     return ch in tones_dict
 
@@ -87,23 +97,37 @@ def _match_punctuation_with_context(text, i, punctuation_keys, tones_keys, rushi
       1) 位置 i 能匹配某個標點鍵
       2) 前面只能是：起始/空格/ tone / rushio 結尾
       3) 後面第一個非空白不可是 tone
-    ★ 特例：若命中「開括號」或「閉括號」集合，直接視為標點（避免被拼音誤吃）
+    ★ 特例A：若命中「開括號」或「閉括號」集合，依脈絡直接視為標點（避免被拼音誤吃）
+    ★ 特例B：分號 '⠆' 必須「前 rushio 或 tone」且「後緊接點字空格 U+2800」才算標點
+             否則交回主流程（可能是 bb 或 ˇ）
     """
     # 嘗試匹配任何標點（含可帶尾空白的鍵）
     punct_len, punct_match = match_from_dict(text, i, punctuation_keys, allow_trailing_space=True)
     if punct_len == 0 or punct_match is None:
         return 0, None
 
-    # ★ 高優先級（收斂版）：括號類「在合理脈絡」才放行，避免與母音同形時誤殺
-    # ★ 高優先級（收斂版）：括號類「在合理脈絡」才放行，避免與母音同形時誤殺
+    # ★ 特例B：分號 '⠆' 的嚴格脈絡（避免誤吃成分號）
+    if punct_match == '⠆':
+        # 後綴：下一個字元「必須」是點字空格（緊接，不跳過一般空白）
+        next_is_bspace = (i + punct_len < len(text) and text[i + punct_len] == '\u2800')
+        # 前綴：是否以 rushio / tone 鍵結尾（最長優先）
+        _, rkey = _endswith_any(text, i, rushio_keys)
+        _, tkey = _endswith_any(text, i, tones_keys)
+        prev_is_rushio = (rkey is not None)
+        prev_is_tone   = (tkey is not None)
+        if next_is_bspace and (prev_is_rushio or prev_is_tone):
+            return punct_len, punct_match
+        else:
+            # 不符合分號脈絡 → 不當標點，讓主流程處理（bb 或 ˇ）
+            return 0, None
+
+    # ★ 特例A（收斂版）：括號類在合理脈絡直接放行
     if opening_braille_set and punct_match in opening_braille_set:
         if not _has_syllable_content(current_syllable):  # 不在組音節中
             prev_ch = _prev_nonspace(text, i)
-            # 前面是起始/空白/已確定的點字標點鍵（用 punct_map 的鍵判斷）
             if prev_ch == '' or prev_ch == ' ' or prev_ch in punct_map:
                 next_ch = _peek_nonspace(text, i + punct_len)
-                # 開括號後面不能馬上是 tone（標點不帶 tone）
-                if not next_ch or next_ch not in tones_keys:
+                if not next_ch or next_ch not in tones_keys:  # 開括號不帶 tone
                     return punct_len, punct_match
         # 不符合上述脈絡 → 不強行放行，落回一般規則
 
@@ -111,16 +135,17 @@ def _match_punctuation_with_context(text, i, punctuation_keys, tones_keys, rushi
         # 閉括號通常出現在音節後；只要不在組音節中就視為標點
         if not _has_syllable_content(current_syllable):
             return punct_len, punct_match
-        # 若正在組音節，先讓音節結束後再由外層流程處理，不在這裡硬判
-        return 0, None
+        return 0, None  # 讓外層先收束音節
 
-    # 前面脈絡：只能是起始/空格/ tone / rushio
+    # 一般脈絡：前面只能是起始/空白/ tone / rushio 結尾
     prev_ch = _prev_nonspace(text, i)
     prev_ok = False
     if prev_ch == '' or prev_ch == ' ':
         prev_ok = True
     else:
-        if prev_ch in tones_keys:
+        # tone：用最長結尾檢查以涵蓋多鍵情況
+        _, tkey = _endswith_any(text, i, tones_keys)
+        if tkey is not None:
             prev_ok = True
         else:
             _, rkey = _endswith_any(text, i, rushio_keys)
@@ -129,7 +154,7 @@ def _match_punctuation_with_context(text, i, punctuation_keys, tones_keys, rushi
     if not prev_ok:
         return 0, None
 
-    # 後面脈絡：第一個非空白不能是 tone（標點不帶 tone）
+    # 後面第一個非空白不可是 tone（標點不帶 tone）
     next_ch = _peek_nonspace(text, i + punct_len)
     if next_ch and next_ch in tones_keys:
         return 0, None
@@ -260,17 +285,38 @@ def convert_braille_to_pinyin(braille_text, dialect):
             i += len(matched_close)
             continue
 
-        # ★ 高優先級：若 '⠆' 後為點字空格，且「前面是 rushio 或 tone」，視為分號 '；'
-        if braille_text[i] == '⠆' and i + 1 < length and braille_text[i + 1] == '\u2800':
+        # ★★★ Tri-disambiguation for '⠆'：分號； / 子音 bb / 調號 ˇ ★★★
+        if braille_text[i] == '⠆':
+            next_is_bspace = (i + 1 < length and braille_text[i + 1] == '\u2800')
+
+            # 前綴查表：判斷「前面是否以 rushio 或 tone 鍵結尾」
             prev_is_rushio = _endswith_key(braille_text, i, rushio_key_set, rushio_max_len)
             prev_is_tone   = _endswith_key(braille_text, i, tones_key_set,  tones_max_len)
-            if prev_is_rushio or prev_is_tone:
+
+            # 1) 『分號；』：前面是 rushio 或 tone，且後面是「點字空格」
+            if next_is_bspace and (prev_is_rushio or prev_is_tone):
                 if _has_syllable_content(current_syllable):
                     result.append(assemble_syllable(current_syllable))
                     current_syllable = {"initial": "", "vowel": "", "rushio": "", "tone": "", "nasal": False}
                 result.append('；')
-                i += 2  # 跳過 '⠆' 與點字空格
+                i += 2  # 跳過 '⠆' + 點字空格
                 continue
+
+            # 2) 『子音 bb』：僅在音節起始，且 '⠆' 後面「立刻」能匹配母音鍵
+            if not _has_syllable_content(current_syllable):
+                vlen, _ = match_from_dict(braille_text, i + 1, vowels_keys)
+                if vlen > 0:
+                    current_syllable["initial"] = consonants['⠆']
+                    i += 1
+                    continue
+                # 起始但後面不是母音 → 不當 bb，交給後續（可能是 tone 或其他）
+
+            # 3) 『調號 ˇ』：前面不是 rushio/其他 tone，且當前音節已開、尚未有 tone
+            if not (prev_is_rushio or prev_is_tone) and _has_syllable_content(current_syllable) and not current_syllable["tone"]:
+                current_syllable["tone"] = tones['⠆']
+                i += 1
+                continue
+            # 以上皆非 → 交由一般流程（之後的標點/母音/子音/tone 判斷）
 
         # ★ (A) 標點：先用「脈絡判定」的方式辨識，避免把母音/聲母誤當標點
         punct_len, punct_match = _match_punctuation_with_context(
@@ -299,6 +345,8 @@ def convert_braille_to_pinyin(braille_text, dialect):
                 result.append(punctuations[punct_match])
 
             i += punct_len
+            if result and result[-1] == '；':
+                i += _eat_spaces(braille_text, i)
             continue
 
         # ★ (B) 兼容你原有「某些前綴形標點」的特殊判斷（多數情形會被 (A) 提早處理）
@@ -322,6 +370,8 @@ def convert_braille_to_pinyin(braille_text, dialect):
                         current_syllable = {"initial": "", "vowel": "", "rushio": "", "tone": "", "nasal": False}
                     result.append(punctuations[sp_match])
                     i += sp_len
+                    if result and result[-1] == '；':
+                        i += _eat_spaces(braille_text, i)
                     continue
 
         # (C) 拼音區塊開始：鼻化 ⠠
@@ -378,6 +428,8 @@ def convert_braille_to_pinyin(braille_text, dialect):
                                 result.append(punctuations[p_match])
 
                             i += p_len
+                            if result and result[-1] == '；':
+                                i += _eat_spaces(braille_text, i)
                             continue
 
             result.append(assemble_syllable(current_syllable))
@@ -504,6 +556,8 @@ def convert_braille_to_pinyin(braille_text, dialect):
                                 result.append(punctuations[p_match])
 
                             i += p_len
+                            if result and result[-1] == '；':
+                                i += _eat_spaces(braille_text, i)
                             continue
 
             # 結束音節
@@ -546,6 +600,8 @@ def convert_braille_to_pinyin(braille_text, dialect):
             else:
                 result.append(punctuations[p2_match])
             i += p2_len
+            if result and result[-1] == '；':
+                i += _eat_spaces(braille_text, i)
             continue
         else:
             result.append(braille_text[i])
@@ -556,12 +612,19 @@ def convert_braille_to_pinyin(braille_text, dialect):
         result.append(assemble_syllable(current_syllable))
 
     raw_pinyin = ''.join(result)
-    # 讓 _ 後面接拼音的地方空一格
-    final_pinyin = re.sub(r'_(?=[a-zA-Zng])', ' ', raw_pinyin)
-    # 把其他的 _ 全部移除（遇到標點的情況）
+
+    # 底線轉空白：但「，；」之後的底線不轉空白（避免標點後多一格）
+    final_pinyin = re.sub(r'(?<![，；])_(?=[a-zA-Zng])', ' ', raw_pinyin)
+
+    # 把其他殘留底線移除
     final_pinyin = final_pinyin.replace('_', '')
-    # ★ 逗號「，」前後不留空白（你要的是明眼拼音的逗號）
+
+    # ★ 關鍵補強：移除「，；」後緊接的所有空白（同時吃 ASCII 空格與點字空格 U+2800）
+    final_pinyin = re.sub(r'([，；])(?: |\u2800)+', r'\1', final_pinyin)
+
+    # 逗號「，」前後不留空白（原規則保留；這行針對一般空白）
     final_pinyin = re.sub(r'\s*，\s*', '，', final_pinyin)
+
     return final_pinyin
 
 def add_space_after_tone_less_syllable(text):
